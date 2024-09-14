@@ -1,0 +1,147 @@
+<html>
+<head>
+  <title>Emoji Search</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+   .emoji-result {
+       text-align: center;
+       margin-bottom: 1rem;
+   }
+
+   .emoji-result img {
+       max-width: 100%;
+       height: auto;
+   }
+
+   .emoji-result .emoji-name {
+       font-weight: bold;
+   }
+
+   .emoji-result .emoji-alias {
+       color: #888;
+       font-size: 0.9rem;
+   }
+  </style>
+</head>
+<body>
+  <div class="container my-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <div class="input-group mb-3">
+          <input type="text" class="form-control" id="searchInput" placeholder="Search for emoji...">
+        </div>
+        <div id="resultContainer" class="row"></div>
+        <p id="matchCount" class="text-muted"></p>
+      </div>
+    </div>
+  </div>
+  <script>
+    var emojiData = [];
+
+    loadCSVData('emoji.csv')
+        .then(ed => {
+            // Use the loaded emojiData here
+            console.log(ed);
+            emojiData = ed;
+        })
+        .catch(error => {
+            console.error('Error loading CSV data:', error);
+        });
+
+    const searchInput = document.getElementById('searchInput');
+    const resultContainer = document.getElementById('resultContainer');
+    const matchCount = document.getElementById('matchCount');
+
+    searchInput.addEventListener('input', handleSearch);
+
+    function handleSearch() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredEmoji = filterEmoji(emojiData, searchTerm);
+        const sortedEmoji = sortEmoji(filteredEmoji, searchTerm);
+        const limitedEmoji = sortedEmoji.slice(0, 100);
+        updateResultContainer(limitedEmoji);
+        updateMatchCount(sortedEmoji.length);
+    }
+
+    function filterEmoji(emojiData, searchTerm) {
+        return emojiData.filter(emoji => emoji.name.toLowerCase().includes(searchTerm));
+    }
+
+    function sortEmoji(emojiData, searchTerm) {
+        return emojiData.sort((a, b) => {
+            const aMatch = a.name.toLowerCase() === searchTerm;
+            const bMatch = b.name.toLowerCase() === searchTerm;
+            if (aMatch && !bMatch) return -1;
+            if (!aMatch && bMatch) return 1;
+            return 0;
+        });
+    }
+
+    function updateMatchCount(count) {
+        matchCount.textContent = `Total matches: ${count}`;
+    }
+
+    function loadCSVData(file) {
+        return fetch(file)
+            .then(response => response.text())
+            .then(data => {
+                const emojiData = new Map();
+                var rows = data.trim().split('\n');
+                rows.shift()
+
+                rows.forEach(row => {
+                    const [name, url] = row.split(',');
+                    if (url.startsWith('alias:')) {
+                        const aliasDestination = url.slice(6);
+                        emojiData.set(name, { name, alias: aliasDestination });
+                    } else {
+                        emojiData.set(name, { name, url });
+                    }
+                });
+
+                return Array.from(emojiData.values());
+            })
+            .catch(error => {
+                console.error('Error loading CSV data:', error);
+                return [];
+            });
+    }
+
+    function getSourceEmoji(emoji) {
+        console.log("get emoji source", emoji.name);
+        if (emoji.url) {
+            return emoji;
+        } else if (emoji.alias) {
+            const aliasEmoji = emojiData.find(e => e.name === emoji.alias);
+            return getSourceEmoji(aliasEmoji);
+        }
+        return null;
+    }
+
+    function updateResultContainer(emojiData) {
+        resultContainer.innerHTML = '';
+        emojiData.forEach(emoji => {
+            const emojiResult = document.createElement('div');
+            emojiResult.classList.add('col-sm');
+            const img = document.createElement('img');
+            const sourceEmoji = getSourceEmoji(emoji);
+            if (sourceEmoji) {
+                img.src = sourceEmoji.url;
+            } else {
+                img.src = ''; // or a default image
+            }
+            const name = document.createElement('span');
+            name.textContent = emoji.name;
+            emojiResult.appendChild(img);
+            emojiResult.appendChild(name);
+            if (emoji.alias) {
+                const aliasContainer = document.createElement('div');
+                aliasContainer.textContent = `Alias of: ${emoji.alias}`;
+                emojiResult.appendChild(aliasContainer);
+            }
+            resultContainer.appendChild(emojiResult);
+        });
+    }
+  </script>
+</body>
+</html>
