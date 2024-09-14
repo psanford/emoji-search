@@ -2,31 +2,78 @@
 <head>
   <title>Emoji Search</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
   <style>
-   .emoji-result {
-       text-align: center;
-       margin-bottom: 1rem;
-   }
+    .emoji-result {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
 
-   .emoji-result img {
-       max-width: 100%;
-       height: auto;
-   }
+    .emoji-result img {
+      max-width: 100%;
+      height: auto;
+    }
 
-   .emoji-result .emoji-name {
-       font-weight: bold;
-   }
+    .emoji-result .emoji-name {
+      font-weight: bold;
+    }
 
-   .emoji-result .emoji-alias {
-       color: #888;
-       font-size: 0.9rem;
-   }
+    .emoji-result .emoji-alias {
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    #advancedMenu {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      width: 300px;
+      height: 100%;
+      background-color: #f8f9fa;
+      transition: right 0.3s ease-in-out;
+      padding: 20px;
+      box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+    }
+
+    #advancedMenu.open {
+      right: 0;
+    }
+
+    #toggleAdvanced {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1001;
+    }
+
+    .main-content {
+      transition: margin-right 0.3s ease-in-out;
+    }
+
+    .main-content.shifted {
+      margin-right: 300px;
+    }
   </style>
 </head>
 <body>
-  <div class="container my-5">
+  <button id="toggleAdvanced" class="btn btn-light btn-sm">
+    <i class="fas fa-cog"></i>
+  </button>
+
+  <div id="advancedMenu">
+    <h5 class="mb-3">Advanced Options</h5>
+    <div class="form-group">
+      <label for="csvUrlInput">CSV URL:</label>
+      <input type="text" class="form-control" id="csvUrlInput" placeholder="Enter CSV URL">
+    </div>
+    <button class="btn btn-primary btn-sm" id="loadCsvButton">Load CSV</button>
+  </div>
+
+  <div class="container my-5 main-content">
     <div class="row justify-content-center">
       <div class="col-md-8">
+
         <div class="input-group mb-3">
           <input type="text" class="form-control" id="searchInput" placeholder="Search for emoji...">
         </div>
@@ -35,113 +82,177 @@
       </div>
     </div>
   </div>
+
   <script>
-    var emojiData = [];
+      var emojiData = [];
+      const defaultCsvUrl = 'emoji.csv';
+      let currentCsvUrl = defaultCsvUrl;
 
-    loadCSVData('emoji.csv')
-        .then(ed => {
-            // Use the loaded emojiData here
-            console.log(ed);
+      const toggleAdvancedButton = document.getElementById('toggleAdvanced');
+      const advancedMenu = document.getElementById('advancedMenu');
+      const mainContent = document.querySelector('.main-content');
+      const csvUrlInput = document.getElementById('csvUrlInput');
+      const loadCsvButton = document.getElementById('loadCsvButton');
+      const searchInput = document.getElementById('searchInput');
+      const resultContainer = document.getElementById('resultContainer');
+      const matchCount = document.getElementById('matchCount');
+      const errorMessage = document.getElementById('errorMessage');
+
+      toggleAdvancedButton.addEventListener('click', toggleAdvancedMenu);
+      loadCsvButton.addEventListener('click', () => handleCsvLoad(csvUrlInput.value.trim()));
+      searchInput.addEventListener('input', handleSearch);
+
+      function toggleAdvancedMenu() {
+        advancedMenu.classList.toggle('open');
+        mainContent.classList.toggle('shifted');
+      }
+
+      function handleCsvLoad(url) {
+        const newCsvUrl = url || defaultCsvUrl;
+        const isCustomCsv = newCsvUrl !== defaultCsvUrl;
+
+        loadCSVData(newCsvUrl)
+          .then(ed => {
+            console.log('Loaded CSV data:', ed);
             emojiData = ed;
-        })
-        .catch(error => {
+            currentCsvUrl = newCsvUrl;
+            hideError();
+            updateUrlParameter(newCsvUrl);
+            if (isCustomCsv) {
+              showSuccess('Custom CSV loaded successfully!');
+            }
+          })
+          .catch(error => {
             console.error('Error loading CSV data:', error);
-        });
+            if (isCustomCsv) {
+              showError('Failed to load custom CSV. Please check the URL and try again.');
+              handleCsvLoad(defaultCsvUrl);
+            } else {
+              showError('Failed to load default CSV. Please try again later.');
+            }
+          });
+      }
 
-    const searchInput = document.getElementById('searchInput');
-    const resultContainer = document.getElementById('resultContainer');
-    const matchCount = document.getElementById('matchCount');
-
-    searchInput.addEventListener('input', handleSearch);
-
-    function handleSearch() {
+      function handleSearch() {
         const searchTerm = searchInput.value.toLowerCase();
         const filteredEmoji = filterEmoji(emojiData, searchTerm);
         const sortedEmoji = sortEmoji(filteredEmoji, searchTerm);
         const limitedEmoji = sortedEmoji.slice(0, 100);
         updateResultContainer(limitedEmoji);
         updateMatchCount(sortedEmoji.length);
-    }
+      }
 
-    function filterEmoji(emojiData, searchTerm) {
+      function filterEmoji(emojiData, searchTerm) {
         return emojiData.filter(emoji => emoji.name.toLowerCase().includes(searchTerm));
-    }
+      }
 
-    function sortEmoji(emojiData, searchTerm) {
+      function sortEmoji(emojiData, searchTerm) {
         return emojiData.sort((a, b) => {
-            const aMatch = a.name.toLowerCase() === searchTerm;
-            const bMatch = b.name.toLowerCase() === searchTerm;
-            if (aMatch && !bMatch) return -1;
-            if (!aMatch && bMatch) return 1;
-            return 0;
+          const aMatch = a.name.toLowerCase() === searchTerm;
+          const bMatch = b.name.toLowerCase() === searchTerm;
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+          return 0;
         });
-    }
+      }
 
-    function updateMatchCount(count) {
+      function updateMatchCount(count) {
         matchCount.textContent = `Total matches: ${count}`;
-    }
+      }
 
-    function loadCSVData(file) {
+      function loadCSVData(file) {
         return fetch(file)
-            .then(response => response.text())
-            .then(data => {
-                const emojiData = new Map();
-                var rows = data.trim().split('\n');
-                rows.shift()
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+          })
+          .then(data => {
+            const emojiData = new Map();
+            var rows = data.trim().split('\n');
+            rows.shift()
 
-                rows.forEach(row => {
-                    const [name, url] = row.split(',');
-                    if (url.startsWith('alias:')) {
-                        const aliasDestination = url.slice(6);
-                        emojiData.set(name, { name, alias: aliasDestination });
-                    } else {
-                        emojiData.set(name, { name, url });
-                    }
-                });
-
-                return Array.from(emojiData.values());
-            })
-            .catch(error => {
-                console.error('Error loading CSV data:', error);
-                return [];
+            rows.forEach(row => {
+              const [name, url] = row.split(',');
+              if (url.startsWith('alias:')) {
+                const aliasDestination = url.slice(6);
+                emojiData.set(name, { name, alias: aliasDestination });
+              } else {
+                emojiData.set(name, { name, url });
+              }
             });
-    }
 
-    function getSourceEmoji(emoji) {
-        console.log("get emoji source", emoji.name);
+            return Array.from(emojiData.values());
+          });
+      }
+
+      function getSourceEmoji(emoji) {
+        console.log("get emoji source", emoji);
         if (emoji.url) {
-            return emoji;
+          return emoji;
         } else if (emoji.alias) {
-            const aliasEmoji = emojiData.find(e => e.name === emoji.alias);
-            return getSourceEmoji(aliasEmoji);
+          const aliasEmoji = emojiData.find(e => e.name === emoji.alias);
+          return getSourceEmoji(aliasEmoji);
         }
         return null;
-    }
+      }
 
-    function updateResultContainer(emojiData) {
+      function updateResultContainer(emojiData) {
         resultContainer.innerHTML = '';
         emojiData.forEach(emoji => {
-            const emojiResult = document.createElement('div');
-            emojiResult.classList.add('col-sm');
-            const img = document.createElement('img');
-            const sourceEmoji = getSourceEmoji(emoji);
-            if (sourceEmoji) {
-                img.src = sourceEmoji.url;
-            } else {
-                img.src = ''; // or a default image
-            }
-            const name = document.createElement('span');
-            name.textContent = emoji.name;
-            emojiResult.appendChild(img);
-            emojiResult.appendChild(name);
-            if (emoji.alias) {
-                const aliasContainer = document.createElement('div');
-                aliasContainer.textContent = `Alias of: ${emoji.alias}`;
-                emojiResult.appendChild(aliasContainer);
-            }
-            resultContainer.appendChild(emojiResult);
+          const emojiResult = document.createElement('div');
+          emojiResult.classList.add('col-sm');
+          const img = document.createElement('img');
+          const sourceEmoji = getSourceEmoji(emoji);
+          if (sourceEmoji) {
+            img.src = sourceEmoji.url;
+          } else {
+            img.src = ''; // or a default image
+          }
+          const name = document.createElement('span');
+          name.textContent = emoji.name;
+          emojiResult.appendChild(img);
+          emojiResult.appendChild(name);
+          if (emoji.alias) {
+            const aliasContainer = document.createElement('div');
+            aliasContainer.textContent = `Alias of: ${emoji.alias}`;
+            emojiResult.appendChild(aliasContainer);
+          }
+          resultContainer.appendChild(emojiResult);
         });
-    }
+      }
+
+      function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.className = 'alert alert-danger';
+        errorMessage.style.display = 'block';
+      }
+
+      function showSuccess(message) {
+        errorMessage.textContent = message;
+        errorMessage.className = 'alert alert-success';
+        errorMessage.style.display = 'block';
+      }
+
+      function hideError() {
+        errorMessage.style.display = 'none';
+      }
+
+      function updateUrlParameter(csvUrl) {
+        const url = new URL(window.location);
+        url.searchParams.set('csv', csvUrl);
+        window.history.pushState({}, '', url);
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const csvParam = urlParams.get('csv');
+      if (csvParam && csvParam !== defaultCsvUrl) {
+        csvUrlInput.value = csvParam;
+        handleCsvLoad(csvParam);
+      } else {
+        handleCsvLoad(defaultCsvUrl);
+      }
   </script>
 </body>
 </html>
